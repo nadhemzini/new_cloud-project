@@ -8,8 +8,8 @@ terraform {
     }
   }
 
-  backend "s3" {
-    # Configured via -backend-config flags at init time
+  backend "local" {
+    path = "terraform.tfstate"
   }
 }
 
