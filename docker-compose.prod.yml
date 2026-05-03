@@ -7,7 +7,7 @@ services:
       DB_URL: ${DB_URL}
       DB_USERNAME: ${DB_USERNAME}
       DB_PASSWORD: ${DB_PASSWORD}
-      CORS_ORIGINS: "*"
+      CORS_ORIGINS: ${CORS_ORIGINS}
     restart: always
 
   frontend:

@@ -80,6 +80,11 @@ locals {
     chmod +x /usr/local/lib/docker/cli-plugins/docker-compose
     ln -s /usr/local/lib/docker/cli-plugins/docker-compose /usr/bin/docker-compose
 
+    # Install Docker Buildx
+    curl -SL https://github.com/docker/buildx/releases/download/v0.17.1/buildx-v0.17.1.linux-amd64 -o /usr/local/lib/docker/cli-plugins/docker-buildx
+    chmod +x /usr/local/lib/docker/cli-plugins/docker-buildx
+
+
     yum install git -y
 
     mkdir -p /opt/app
@@ -102,6 +107,7 @@ locals {
     DB_USERNAME=${var.db_username}
     DB_PASSWORD=${var.db_password}
     VITE_API_URL=http://$PUBLIC_IP:8080
+    CORS_ORIGINS=http://$PUBLIC_IP
     ENV_EOF
 
     # Fix ownership of .env
