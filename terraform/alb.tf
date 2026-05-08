@@ -1,24 +1,13 @@
-# ============================================================
-# Application Load Balancer
-# — Spans BOTH public subnets (AZ-A + AZ-B)
-# — Target Group → Backend EC2 instances on port 8080
-# — Health check: GET /actuator/health → HTTP 200
-# ============================================================
-
-# ---------- ALB ----------
 resource "aws_lb" "main" {
   name               = "${var.project_name}-${var.environment}-alb"
   internal           = false
   load_balancer_type = "application"
   security_groups    = [aws_security_group.alb.id]
-  subnets            = aws_subnet.public[*].id   # both public subnets
+  subnets            = aws_subnet.public[*].id
 
-  tags = {
-    Name = "${var.project_name}-${var.environment}-alb"
-  }
+  tags = { Name = "${var.project_name}-${var.environment}-alb" }
 }
 
-# ---------- Target Group ----------
 resource "aws_lb_target_group" "backend" {
   name        = "${var.project_name}-${var.environment}-tg"
   port        = var.backend_port
@@ -28,22 +17,19 @@ resource "aws_lb_target_group" "backend" {
 
   health_check {
     enabled             = true
-    path                = var.health_check_path
+    path                = "/actuator/health"
     port                = "traffic-port"
     protocol            = "HTTP"
     matcher             = "200"
-    interval            = 30
-    timeout             = 10
+    interval            = 60
+    timeout             = 30
     healthy_threshold   = 2
-    unhealthy_threshold = 3
+    unhealthy_threshold = 5
   }
 
-  tags = {
-    Name = "${var.project_name}-${var.environment}-backend-tg"
-  }
+  tags = { Name = "${var.project_name}-${var.environment}-backend-tg" }
 }
 
-# ---------- Listener: HTTP :80 → forward to Target Group ----------
 resource "aws_lb_listener" "http" {
   load_balancer_arn = aws_lb.main.arn
   port              = 80

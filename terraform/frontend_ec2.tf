@@ -26,12 +26,12 @@ locals {
     # ── 3. Clone project ─────────────────────────────────────
     mkdir -p /opt/app
     cd /opt/app
-    git clone ${var.github_repo_url} cloud-project
-    chown -R ec2-user:ec2-user /opt/app/cloud-project
+    git clone ${var.github_repo_url} new_cloud-project
+    chown -R ec2-user:ec2-user /opt/app/new_cloud-project
 
     # ── 4. Build & run frontend with ALB DNS injected ─────────
     # VITE_API_URL points to ALB — NOT the backend EC2 IP
-    cd /opt/app/cloud-project
+    cd /opt/app/new_cloud-project
 
     docker build \
       --build-arg VITE_API_URL=http://${aws_lb.main.dns_name} \

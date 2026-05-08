@@ -79,7 +79,7 @@ variable "cpu_scale_out_threshold" {
 variable "github_repo_url" {
   description = "GitHub repo URL (used by User Data to clone the project)"
   type        = string
-  default     = "https://github.com/nadhemzini/cloud-project"
+  default     = "https://github.com/nadhemzini/new_cloud-project"
 }
 
 variable "backend_port" {
