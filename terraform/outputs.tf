@@ -19,7 +19,10 @@ output "alb_dns_name" {
   description = "ALB DNS — paste this as VITE_API_URL in frontend and CORS_ORIGINS in backend"
   value       = "http://${aws_lb.main.dns_name}"
 }
-
+output "private_key_pem" {
+  value     = tls_private_key.deploy_key.private_key_pem
+  sensitive = true
+}
 output "alb_dns_raw" {
   description = "Raw ALB DNS name (without http://)"
   value       = aws_lb.main.dns_name
