@@ -1,6 +1,7 @@
 # ============================================================
-# VPC, Subnets, Internet Gateway, Route Tables
-# (No NAT Gateway — saves cost, EC2 is in public subnet)
+# VPC — 10.0.0.0/16
+# 2 public subnets  (10.0.1.0/24, 10.0.2.0/24)
+# 2 private subnets (10.0.3.0/24, 10.0.4.0/24)
 # ============================================================
 
 resource "aws_vpc" "main" {
@@ -13,12 +14,13 @@ resource "aws_vpc" "main" {
   }
 }
 
-# ---------- Public Subnets (for EC2 + ALB) ----------
+# ---------- Public Subnets (Frontend EC2 + ALB) ----------
 resource "aws_subnet" "public" {
-  count                   = 2
+  count = 2
+
   vpc_id                  = aws_vpc.main.id
-  cidr_block              = cidrsubnet(aws_vpc.main.cidr_block, 8, count.index)
-  availability_zone       = data.aws_availability_zones.available.names[count.index]
+  cidr_block              = count.index == 0 ? "10.0.1.0/24" : "10.0.2.0/24"
+  availability_zone       = count.index == 0 ? "us-east-1a" : "us-east-1b"
   map_public_ip_on_launch = true
 
   tags = {
@@ -26,12 +28,13 @@ resource "aws_subnet" "public" {
   }
 }
 
-# ---------- Private Subnets (for RDS only) ----------
+# ---------- Private Subnets (Backend ASG + RDS) ----------
 resource "aws_subnet" "private" {
-  count             = 2
+  count = 2
+
   vpc_id            = aws_vpc.main.id
-  cidr_block        = cidrsubnet(aws_vpc.main.cidr_block, 8, count.index + 10)
-  availability_zone = data.aws_availability_zones.available.names[count.index]
+  cidr_block        = count.index == 0 ? "10.0.3.0/24" : "10.0.4.0/24"
+  availability_zone = count.index == 0 ? "us-east-1a" : "us-east-1b"
 
   tags = {
     Name = "${var.project_name}-${var.environment}-private-${count.index + 1}"
@@ -45,24 +48,4 @@ resource "aws_internet_gateway" "main" {
   tags = {
     Name = "${var.project_name}-${var.environment}-igw"
   }
-}
-
-# ---------- Route Table (public) ----------
-resource "aws_route_table" "public" {
-  vpc_id = aws_vpc.main.id
-
-  route {
-    cidr_block = "0.0.0.0/0"
-    gateway_id = aws_internet_gateway.main.id
-  }
-
-  tags = {
-    Name = "${var.project_name}-${var.environment}-public-rt"
-  }
-}
-
-resource "aws_route_table_association" "public" {
-  count          = 2
-  subnet_id      = aws_subnet.public[count.index].id
-  route_table_id = aws_route_table.public.id
 }

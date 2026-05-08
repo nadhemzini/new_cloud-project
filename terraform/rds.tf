@@ -1,38 +1,15 @@
 # ============================================================
-# RDS — PostgreSQL (AWS Academy compatible)
+# RDS — PostgreSQL 15
+# — DB Subnet Group uses BOTH private subnets
+# — Security Group: only from Backend EC2 SG (defined in security_groups.tf)
 # ============================================================
 
 resource "aws_db_subnet_group" "postgres" {
   name       = "${var.project_name}-${var.environment}-db-subnet"
-  subnet_ids = aws_subnet.private[*].id
+  subnet_ids = aws_subnet.private[*].id   # both private subnets
 
   tags = {
     Name = "${var.project_name}-${var.environment}-db-subnet-group"
-  }
-}
-
-resource "aws_security_group" "rds" {
-  name        = "${var.project_name}-${var.environment}-rds-sg"
-  description = "Allow PostgreSQL access from backend EC2"
-  vpc_id      = aws_vpc.main.id
-
-  ingress {
-    description     = "PostgreSQL from backend"
-    from_port       = 5432
-    to_port         = 5432
-    protocol        = "tcp"
-    security_groups = [aws_security_group.app.id]
-  }
-
-  egress {
-    from_port   = 0
-    to_port     = 0
-    protocol    = "-1"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-
-  tags = {
-    Name = "${var.project_name}-${var.environment}-rds-sg"
   }
 }
 
@@ -48,10 +25,10 @@ resource "aws_db_instance" "postgres" {
 
   db_name  = var.db_name
   username = var.db_username
-  password = var.db_password
+  password = var.db_password   # passed as sensitive variable, never hardcoded
 
   db_subnet_group_name   = aws_db_subnet_group.postgres.name
-  vpc_security_group_ids = [aws_security_group.rds.id]
+  vpc_security_group_ids = [aws_security_group.rds.id]   # only Backend EC2 SG allowed in
 
   multi_az            = false
   publicly_accessible = false

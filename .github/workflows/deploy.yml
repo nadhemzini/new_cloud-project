@@ -1,22 +1,86 @@
-name: Deploy to EC2
+name: Deploy Full Stack
 
 on:
   push:
-    branches:
-      - main
+    branches: [main]
 
 jobs:
-  deploy:
+  # ── Job 1: Deploy Frontend ────────────────────────────────────────────────
+  deploy-frontend:
+    name: Deploy Frontend to EC2
     runs-on: ubuntu-latest
 
     steps:
-      - name: Deploy to EC2
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: SSH into Frontend EC2 and redeploy
         uses: appleboy/ssh-action@master
         with:
-          host: ${{ secrets.EC2_HOST }}
+          host: ${{ secrets.FRONTEND_EC2_IP }}
           username: ec2-user
           key: ${{ secrets.EC2_SSH_KEY }}
           script: |
+            set -e
             cd /opt/app/cloud-project
             git pull origin main
-            docker-compose -f docker-compose.prod.yml up -d --build
+
+            # Rebuild with latest ALB DNS
+            docker build \
+              --build-arg VITE_API_URL=http://${{ secrets.ALB_DNS_NAME }} \
+              -t frontend:latest ./frontend
+
+            docker stop frontend || true
+            docker rm   frontend || true
+
+            docker run -d \
+              --name frontend \
+              --restart always \
+              -p 80:80 \
+              frontend:latest
+
+  # ── Job 2: Recycle Backend ASG (pull latest code on new instances) ─────────
+  recycle-backend:
+    name: Recycle Backend ASG Instances
+    runs-on: ubuntu-latest
+    needs: deploy-frontend   # run after frontend succeeds
+
+    steps:
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          aws-access-key-id:     ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-session-token:     ${{ secrets.AWS_SESSION_TOKEN }}
+          aws-region:            us-east-1
+
+      - name: Terminate old ASG instances (ASG auto-replaces with fresh code)
+        run: |
+          ASG_NAME="cloud-stack-sandbox-backend-asg"
+
+          INSTANCE_IDS=$(aws autoscaling describe-auto-scaling-groups \
+            --auto-scaling-group-names "$ASG_NAME" \
+            --query "AutoScalingGroups[0].Instances[*].InstanceId" \
+            --output text)
+
+          if [ -z "$INSTANCE_IDS" ]; then
+            echo "No running instances found in ASG $ASG_NAME"
+            exit 0
+          fi
+
+          echo "Terminating instances: $INSTANCE_IDS"
+          for INSTANCE_ID in $INSTANCE_IDS; do
+            aws autoscaling terminate-instance-in-auto-scaling-group \
+              --instance-id "$INSTANCE_ID" \
+              --no-should-decrement-desired-capacity
+            echo "Terminated $INSTANCE_ID — ASG will launch a replacement with latest git clone"
+          done
+
+      - name: Wait for new instances to become healthy
+        run: |
+          echo "Waiting 3 minutes for Spring Boot startup..."
+          sleep 180
+          aws elbv2 describe-target-health \
+            --target-group-arn ${{ secrets.TARGET_GROUP_ARN }} \
+            --query "TargetHealthDescriptions[*].{ID:Target.Id,Health:TargetHealth.State}" \
+            --output table
